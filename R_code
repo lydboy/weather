@@ -1,0 +1,520 @@
+---
+title: "Weather"
+author: "lyd_boy"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message = FALSE}
+#required libraries
+library(rio)
+library(tidyverse)
+library(lubridate)
+```
+
+
+# PART 1: ANALYSIS
+
+## Dataset Introduction: Valentia Observatory Monthly Data
+
+I have chosen to work with a dataset that records the monthly weather at Valentia Observatory in Ireland. This data set can be downloaded freely from the data.gov.ie wesbite [here](https://data.gov.ie/dataset/valentia-observatory-monthly-data/resource/13b15f4e-5c1e-447e-8933-d60c4dd3d7a4) and the .csv file can be accessed directly [here](https://cli.fusio.net/cli/climate_data/webdata/mly2275.csv).
+
+This dataset details ten different weather elements measured monthly at Valentia Observatory. Valentia Observatory is located on the South-West Coast of Ireland in Co. Kerry, just inland from Valentia Island and approximately 60km west of Killarney. The different elements measured are: 
+ 
+ - Mean Air Temperature (&deg;C)
+ - Maximum Air Temperature (&deg;C)
+ - Minimum Air Temperature (&deg;C)
+ - Mean Maximum Temperature (&deg;C)
+ - Mean Minimum Temperature (&deg;C)
+ - Precipitation Amount (mm)
+ - Grass Minimum Temperature (&deg;C)
+ - Mean Wind Speed (knot)
+ - Highest Gust (knot)
+ - Sunshine duration (hours).
+
+As a complete novice with weather data, I will attempt to use this dataset to investigate whether the effects of climate change can be observed from at Valentia Observatory (or not!). I will focus my analysis on the temperature and precipitation variables.
+
+\newpage
+## Importing and cleaning the dataset
+
+```{r}
+data <- import("mly2275.csv", setclass = "tibble") #import data with rio package
+```
+
+The first two columns of this dataset are year and month. A new column is created to save this info into a date object. This is done using a function of the Lubridate package: `my()` (as our data is in month and year format). This will help with axis labelling when plotting the data later. 
+
+```{r}
+data$date <- my(paste(data$month, data$year, sep = "-")) #add date column
+```
+
+I will not require any columns relating to wind so these can be removed. Also, I am only interested in working with the data from 1980 to 2021.
+
+```{r}
+data2 <- data %>%
+  select(-(gmin:maxgt)) %>%  #removing wind variables and grass min temp
+  filter(year >= 1980 & year <= 2021) #selecting years 1980 onwards
+```
+
+My dataset is now `r dim(data2)[1]` observations (i.e. months) with `r dim(data2)[2] - 3` variables (not including the year, month and date columns).
+
+```{r}
+dim(data2)
+```
+
+Check for `NA` values: There are a total of `r sum(is.na(data2))` missing values. A quick look at the dataset shows that the missing values are in the sun variable and mostly for the most recent years.
+
+```{r}
+sum(is.na(data2$sun))
+```
+
+\newpage
+## Investigation
+
+### 1. Temperature
+
+The dataset has 5 variables relating to temperature: mean, maximum and minimum air temperature and also mean maximum and mean minimum temperatures.
+
+#### Maximum Temperature
+
+We will investigate maximum temperature first. A plot of the maximum temperatures experienced at Valentia Observatory each year from 1980 to 2021 can be seen below.
+
+```{r}
+#Creating dataset of only maxtp months in each year
+data3 <- data2 %>% 
+  group_by(year) %>% 
+  slice_max(maxtp, n = 1)
+
+ggplot(data3, aes(x = year(date), y = maxtp)) +
+  geom_line(color = "dark green") +
+  geom_point(color = "dark green") +
+  theme_light() +
+  labs(x = "Year", y = "Temperature (°C)", 
+       title = "Annual Maximum Temperatures (1980 - 2021)")
+```
+
+It is difficult to see any clear trend in the annual maximum temperature. The fluctuating nature of Irish weather can be seen in the plot. The maximum temperature changes from year to year, sometimes quite dramatically. 2015 only seeing a maximum temperature of `r data3$maxtp[data3$year == 2015]` &deg;C and 1991 having a maximum temperature of `r data3$maxtp[data3$year == 1991]` &deg;C. 
+
+As can be seen from the plot, the range of annual maximum temperatures is from `r range(data3$maxtp)[1]`&deg;C to `r range(data3$maxtp)[2]` &deg;C. However, it can be seen clearly that range of maximum temperatures is greater in the 2010's than the 2000's. Perhaps and indication that the weather is becoming more sporadic. 
+
+The range of annual maximum temperatures:
+```{r}
+range(data3$maxtp)
+```
+
+The average annual maximum temperature is `r mean(data3$maxtp)`&deg;C. 7 of the last 10 years having a maximum temperature above the average.
+```{r}
+mean(data3$maxtp)
+```
+
+
+We can also see what months the maximum temperatures occur in. July being the most likely month to have maximum annual temperature. No surprises here!
+
+```{r warning= FALSE, fig.height = 4}
+#factor of month column with labels
+data3$month <- factor(data3$month, levels = 1:12, 
+                      labels = c("January", "Feburary", "March", "April", "May", "June", 
+                                 "July", "August", "September", "October", "November", 
+                                 "December"))
+#creating histogram plot
+ggplot(data3, aes(data3$month)) +
+  geom_histogram(stat = "count", color = "dark green", fill = "dark green") +
+  theme_light() +
+  labs(title = "Count of Max. Temp. Month (1980 - 2021)", x = "Month", y = "Count")
+  
+```
+
+
+#### Minimum Temperature
+
+To investigate minimum temperatures we begin by creating the same plot as we did earlier for maximum temperatures.
+
+```{r}
+#Creating dataset of only mintp months in each year
+data4 <- data2 %>% 
+  group_by(year) %>% 
+  slice_min(mintp, n = 1)
+
+ggplot(data4, aes(x = year(date), y = mintp))+
+  geom_line(color = "dark green") +
+  geom_point(color = "dark green") +
+  theme_light() +
+  labs(x = "Year", y = "Temperature (°C)", 
+       title = "Annual Minimum Temperatures (1980 - 2021)")
+```
+
+There is more of an upward trend seen in the minimum temperatures but with one exception in 2010. The minimum temperature being a very cold `r data4$mintp[data4$year == 2010]` &deg;C in 2010 and then only two years later not even getting below freezing!
+
+The range in minimum temperatures can be seen below.
+```{r}
+range(data4$mintp)
+```
+
+#### Mean Temperature 
+
+Perhaps a better indication of climate change will be seen in an analysis of the mean annual temperatures.
+
+```{r}
+#creating dataset of the mean of the mean monthly temperatures
+data5 <- data2 %>%
+  group_by(year) %>%
+  summarise_at(vars(meant), list(meantemp = mean))
+
+ggplot(data5, aes(x = year, y = meantemp))+
+  geom_line(color = "dark green") +
+  geom_point(color = "dark green") +
+  theme_light() +
+  labs(x = "Year", y = "Temperature (°C)", 
+       title = "Annual Mean Temperatures (1980 - 2021)")
+
+```
+
+
+In the last decade we can see the mean annual temperature becoming more steady around 11&deg;C. Overall there does seem to be an upward trend in the mean annual temperature and it does not look likely that we will see a mean temperature as low as `r round(data5$meantemp[data5$year == 1986], digits = 2)`&deg;C in 1986 again. Since 2010 the mean annual temperature at Valentia Observatory has not been below `r data5$meantemp[data5$year ==2010]`&deg;C. 
+
+\newpage
+### 2. Rainfall 
+
+As done with the temperature variables, we will attempt to find some trends in the precipitation data given in the dataset. First let us have an overall look at the data available.
+
+```{r}
+#plotting all rain data in one plot for each month
+ggplot(data2, aes(y = rain, x = month(date, label = TRUE))) +
+  geom_point(color = "purple") +
+  theme_light() +
+  labs(x = "Month", y = "Rain (mm)", title = "Monthly Rainfall (1980 - 2021)")
+```
+
+The plot indicates that Ireland has the potential to be a wet country in all months of the year! June is the month with the smallest range of rainfall and December the most, judging by eye from the plot. But how has this rainfall amount changed with time? 
+
+Let's explore only December's rainfall data.
+
+```{r}
+#creating dataset of only December rainfall data
+dec.rain <- data2 %>%
+  filter(month == 12) %>%
+  select(year, month, rain, date)
+
+ggplot(dec.rain, aes(x = year(date), y = rain)) +
+  geom_line(color = "purple") +
+  geom_point(color = "purple") +
+  theme_light() +
+  labs(x = "Year", y = "Rainfall (mm)", title = "December Rainfall (1980 - 2021)")
+  
+```
+
+From the plot we can see the average rain fall is higher in the last decade than the previous one. In the 1990's there was much more fluctuation in the December rainfall. There has been less extreme fluctuation in the rainfall level in the last 10 years. Perhaps an indication that climate change is occurring and our Decembers are becoming more wet.
+
+The total rainfall each year can be easily plotted too. However, like the other plots, a distinct trend is difficult to see. Total rainfall hitting a peak in 2009 and last year being dryer than the previous 8 years.
+
+```{r}
+#creating tibble of sum of rain by year
+totalrain <- data2 %>%
+  group_by(year) %>%
+  summarise_at(vars(rain), list(totalrain = sum))
+
+ggplot(totalrain, aes(x = year, y = totalrain))+
+  geom_line(color = "purple") +
+  geom_point(color = "purple") +
+  theme_light() +
+  labs(x = "Year", y = "Rainfall (mm)", title = "Total Annual Rainfall (1980 - 2021)")
+  
+```
+
+
+But how has this rainfall changed over time? We can investigate if the frequency of different rainfall levels has changed by decade.
+
+```{r}
+#dataset with rain cut into bins
+rain <- data2 %>%
+  select(year, month, rain, date) %>% 
+  filter(year < 2020) %>% #only complete decades
+  mutate(decade = floor(year/10)*10) %>% #adding column to give decade
+  mutate(rain.cut = cut(rain, breaks = c(0,50,100,150,200,250,300,350,400)))
+
+```
+
+Creating a table of frequency of each rainfall bin:
+
+```{r}
+table(rain$rain.cut, rain$decade)
+```
+
+From the table above the frequency of months with rainfall less than 50mm has decreased significantly. The months with 100-150mm and 150-200mm of rainfall have increased. A quick overview it appears we are getting fewer dry months and more wetter months as time passes.
+
+
+### 3. Conclusions
+
+I have realised that weather variables fluctuate a lot, by month, year and decade. It is very hard to discern concrete trends, perhaps without further detail or further scrutinising of the data available. Or with more knowledge of how to analyse weather data!  
+
+From my brief investigation of the temperature variables, it appears that the minimum temperatures are rising. However, I will note, that at the time of writing this, Ireland is experiencing quite a cold snap! Again further proving the unpredictability of the weather. There is, however, a much clearer upward trend in the mean temperatures. Perhaps this is proof of the effects of climate change on the weather in Ireland and that, overall, Ireland is getting hotter. 
+
+From the rainfall data, it is again hard to see a distinct trend in the total annual rainfall data but when we look at the frequencies of how this rain is falling we can definitely see some changes. We seem to be getting more months with average rainfall than drier months as in previous decades.
+
+The Valentia Observatory dataset offers a lot of information on many weather variables. With more knowledge, and more time, perhaps further evidence of global warming and climate change could be ascertained from this valuable data. 
+
+
+\newpage
+## PART 2: R Package - Lubridate
+
+The Lubridate Package (Garrett Grolemund, Hadley Wickham (2011)) is part of the Tidyverse suite of packages which offers functions for working with date and times in R, but also time-spans and time zones. All information about the latest version of the package can be found [here](https://cran.r-project.org/web/packages/lubridate/lubridate.pdf). This package offers many, many functions for dealing with dates and times in R. In general, they are very easy to use functions and I will attempt to explain a few of the functions to you.
+
+First, how to parse date and time information into a date object. Lubridate has a whole load of different functions to parse dates and times depending on the format of your data. For example, if you have dates in the format of year-month-day you can use the `ymd()` function or if they also include times too, there is the `ymd_hms()` function. The naming of the functions is very simple to follow for all of the different types of functions available. For example, in the data analysed in part one I had two columns with year and month and so used the `ym()` function to transform this information into a date column which helped with prettier plotting of my data.
+ 
+Below a vector of different dates are saved to an object called `dates`. This can also easily be the columns of a "data.frame" or "tibble".
+```{r}
+dates <- c("2022-11-23", "2009 3 12", "2024,06,21")
+```
+
+We can see the the mode of the `dates` object is `r mode(dates)`.
+```{r}
+mode(dates)
+```
+
+Now we use the `ymd()` function of Lubridate to change the elements of our object into dates. Note that this function works with the different the separators used in the character strings.
+```{r}
+dates <- ymd(dates)
+dates
+```
+
+And now let us see the structure is of our `dates` object. It is now an object of class "Date".
+```{r}
+str(dates)
+
+```
+
+There are also functions to get or edit the dates. The `year()` function will output the year of the date, the `month()` function the month, and so on.
+
+```{r}
+year(dates)
+```
+
+Here, we can change the day of the first entry in `dates` to 13/11/2022. The Lubridate package has similar functions for all parts of times and dates.
+```{r}
+day(dates[1]) <- 13 
+dates[1]
+```
+
+The `wkday()` and `month()` functions have some arguments which change the output. Setting `label = TRUE` will display the month in character form (e.g. April) as opposed to numeric (e.g. 4). The `abbr = FALSE` will print out "January" as opposed to "Jan".
+```{r}
+month(dates, label = TRUE, abbr = FALSE)
+```
+
+
+Another very useful function of the Lubridate package is the `now()` function which will output the current time in any specified time zone. The list of time zones can be seen in `OlsonNames()`.
+
+```{r}
+now(tzone = "Australia/Perth")
+```
+
+Arithmetic can also be done on date objects. An example here, simply asking if the dates in our `dates` object are in the future or past.
+```{r}
+now() < dates
+```
+
+The Lubridate package has similar functions for time. Quick run through of an example here:
+
+```{r}
+times <- c("12:34:11", "08 17 23", "17 45:3")
+
+times <- hms(times)
+
+times
+
+
+```
+
+Again arithmetic can be done on times:
+```{r}
+times[1] - times[2] + times[3]
+```
+
+
+Another really useful tool of the Lubridate package is the ability to create interval objects. Say for example you have dates and times and you want to check if they sit within certain intervals. This is easily done using the functions available in Lubridate. Below two intervals are creating from our `dates` object using the `interval()` function.
+
+```{r}
+interval1 <- interval(start = dates[1], end = dates[2])
+interval2 <- interval(start = dates[2], end = dates[3])
+```
+
+Let's check the structure of one of the intervals created. You can see the interval is of class 'Interval' created with the package Lubridate. Here we can also see that `interval1` is negative. This is because the start date actually occurs after the end date. 
+```{r}
+str(interval1)
+```
+
+We can use the `int_flip()` function to change this:
+
+```{r}
+interval1 <- int_flip(interval1)
+interval1
+```
+
+You can also access and edit the interval using several functions.
+```{r}
+int_start(interval1)
+```
+
+Editing is easy and can also use the period functions from Lubridate (`years()`, `months()`, `hours()`, etc.) to add or subtract from the interval. 
+```{r}
+int_start(interval2) <-  ymd("2022-05-12") + days(1) - months(1)
+interval2
+```
+
+We can also check if the intervals created overlap. If `TRUE` the intervals do overlap.
+```{r}
+int_overlaps(interval1, interval2)
+```
+
+This has been a very brief introduction into the many functions of the Lubridate package. The functions cover a huge range of actions that you would need to work with dates and times efficiently and effectively in R. 
+
+\newpage
+## PART 3: Functions/Programming
+
+The dataset used in Part 1 is kept up to date every month by MET Eireann. It would be convenient to set a class and create  print, summary and plot functions which could be then used to create new summaries and plots every time the dataset is updated. Not only is the data for Valentia Observatory available but also many other MET Eireann recording sites around Ireland too. In the following sections a print, summary and plot method will be created for a `r "monthlyweather"` class.
+
+
+### Print Method
+
+The print method gives some overall general information about the dataset: the years covered by the dataset, the last month recorded, the variables recorded in the dataset and also a warning if any missing values are found in the dataset.
+
+```{r}
+print.monthlyweather <- function(x) {
+  #extracting first and last year recorded in the dataset
+  cat('The years covered by this monthly weather dataset are:', 
+      x$year[1], 'to', x$year[length(x$year)], '\n')
+  
+  months = c("January", "Feburary", "March", "April", "May", "June", 
+             "July", "August", "September", "October", "November", "December")
+  
+  #a notification of the last month recorded in the dataset
+  cat('The last month updated is', months[x$month[length(x$month)]], 
+      'of', x$year[length(x$year)], '\n')
+  
+  #prints a list of the variable names of the data (not including year, month)
+  cat('The weather variables recorded for each month are: \n', 
+      names(x[3:length(names(x))]), '\n')
+  
+  #a loop to check for missing values in each varible
+  #print warnign if found
+  for(i in 1:length(names(x))) {
+   if(sum(is.na(x[[i]])) != 0) 
+     cat('WARNING: missing values found in:', names(x)[i], '\n')
+  }
+  
+}
+```
+
+
+### Summary Method
+
+There is a large amount of information that can be extracted from the original data set. This summary function will output a data frame of the maximum and minimum of selected variables of interest by year. The data frame can then be easily viewed to extract any required data.
+
+```{r}
+summary.monthlyweather <- function(x) {
+  
+  x <- data.frame(unclass(x)) %>% #data must be in data.frame form 
+    group_by(year) #grouped by year for analysis by year
+  
+  #summaries of selected variables
+  maxtp <- x %>%
+    summarise(max.maxtp = max(maxtp), min.maxtp = min(maxtp)) %>%
+    select(year, max.maxtp, min.maxtp)
+  
+  mintp <- x %>%
+    summarise(max.mintp = max(mintp), min.mintp = min(mintp)) %>%
+    select(max.mintp, min.mintp)
+  
+  rain <- x %>%
+    summarise(max.rain = max(rain), min.rain = min(rain)) %>%
+    select(max.rain, min.rain)
+  
+  wdsp <- x %>%
+    summarise(max.wdsp = max(wdsp), min.wdsp = min(wdsp)) %>%
+    select(max.wdsp, min.wdsp)
+  
+  sun <- x %>%
+    summarise(max.sun = max(sun), min.sun = min(sun)) %>%
+    select(max.sun, min.sun)
+  
+  #summaries output in one data.frame
+  output <- cbind(maxtp, mintp, rain, wdsp, sun)
+  
+  invisible(output) #output dataset can be saved and viewed
+  
+  print(tail(output,10)) #large dataset so only print tail
+  
+}
+
+```
+
+### Plot Method
+
+Again, these weather datasets are large, covering many years, and there are numerous kinds of plots that can be made for each of the variables. Here, a general plot to give a complete overview of all the data given in the dataset is produced. Conveniently, the ggplot function will give a warning if any missing values have been found in the data. Also note, that the code can be easily manipulated to give a plot for any variable. Only two are chosen here.
+
+```{r }
+plot.monthlyweather <- function(x) {
+ 
+x <- data.frame(unclass(x)) #changes x to dataframe
+x$dates <- my(paste(x$month, x$year, sep = "-")) #adds date column for plots
+x$decade <- as.character(floor(x$year/10)*10) #add decade column for facet_wrap
+
+#Only two variables chosen to plot here. 
+#Very easy to modify method to output plots of any variable
+#ggplot will also warn if any NA values found and removed.
+
+plot1 <- ggplot(x, aes(y = sun, x = month(dates, label = TRUE), color = decade)) +
+  geom_point() +
+  theme_light() +
+  labs(x = "Month", y = "Duration (Hours)", title = "Sun Duration", 
+       color = "Decade") +
+  facet_wrap(~ decade, ncol = 2) + 
+  guides(color = "none")
+
+
+plot2 <- ggplot(x, aes(y = rain, x = month(dates, label = TRUE), color = decade)) +
+  geom_point() +
+  theme_light() +
+  labs(x = "Month", y = "Rain (mm)", title = "Rainfall", 
+       color = "Decade") +
+  facet_wrap(~ decade, ncol = 2) + 
+  guides(color = "none")
+
+#print plots
+print(plot1)
+print(plot2)
+
+#returns plot objects so that they may be saved
+invisible(list(plot1, plot2)) 
+
+}
+
+```
+
+
+### Test Class Methods
+
+As mentioned earlier, MET Eireann make datasets available for monthly weather at many stations around Ireland. Here, the class methods written will now be tested with the latest version of the Belmullet monthly data: Available [here](https://data.gov.ie/dataset/belmullet-monthly-data/resource/fc7d62f0-94d4-4a7f-89ad-8d0b9f87f3c9). Prior to using this data, I have only checked that the variables of the dataset are the same as for the Valentia Observatory dataset analysed in Part 1.
+
+```{r}
+belmullet <- import("mly2275.csv", setclass = "data.frame") #importing dataset
+class(belmullet) <- "monthlyweather" #setting class
+```
+
+```{r}
+print(belmullet)
+```
+
+```{r}
+summary(belmullet)
+```
+
+```{r fig.height=10, fig.width = 8}
+par(mfrow=c(1,2))
+plot(belmullet)
+```
+
